@@ -13,19 +13,20 @@ Requirements:
 pip3 install -r requirements.txt
 ```
 
+
+## Usage
+
 Start the server on 8888
 
 ```
-$python3 index.py
+python3 index.py
 ```
 
-Or Specify port:
+Or specify port:
 
 ```
-$python3 index.py --port 8889
+python3 index.py --port 1337
 ```
-
-## Usage
 
 Just call the server URI with a username GET parameter:
 

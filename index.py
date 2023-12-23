@@ -33,7 +33,8 @@ def createMediaJson(post):
 class WebRequestHandler(BaseHTTPRequestHandler):
    def do_GET(self):
         username = imsi = parse_qs(urlparse(self.path).query).get('username', 'instagram')
-        L = instaloader.Instaloader()
+        L = instaloader.Instaloader(download_pictures=False, download_videos=False, download_video_thumbnails=False)
+        L.load_session_from_file("defaultusernameld")
         profile = instaloader.Profile.from_username(L.context, username[0])
         json_post_list = []
         for post in profile.get_posts():

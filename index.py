@@ -34,7 +34,7 @@ def createMediaJson(post):
 
 def getInstagramFeed(username):
         L = instaloader.Instaloader(download_pictures=False, download_videos=False, download_video_thumbnails=False)
-        L.load_session_from_file("defaultusernameld")
+        L.login("defaultusernameld","Fia7qqun!")
         profile = instaloader.Profile.from_username(L.context, username)
         json_post_list = []
         for post in profile.get_posts():

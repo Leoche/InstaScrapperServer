@@ -6,7 +6,9 @@ from functools import cached_property
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import parse_qsl, urlparse, parse_qs
+from cachetools import TTLCache
 
+cache = TTLCache(maxsize=1, ttl=3600)
 
 def createJson(profile, posts):
     return {
@@ -30,22 +32,32 @@ def createMediaJson(post):
         "videoUrl":post.video_url
     }
 
-class WebRequestHandler(BaseHTTPRequestHandler):
-   def do_GET(self):
-        username = imsi = parse_qs(urlparse(self.path).query).get('username', 'instagram')
+def getInstagramFeed(username):
         L = instaloader.Instaloader(download_pictures=False, download_videos=False, download_video_thumbnails=False)
         L.load_session_from_file("defaultusernameld")
-        profile = instaloader.Profile.from_username(L.context, username[0])
+        profile = instaloader.Profile.from_username(L.context, username)
         json_post_list = []
         for post in profile.get_posts():
             json_post_list.append(createMediaJson(post))
             if len(json_post_list) > 8:
                 break
-        returns = createJson(profile, json_post_list)
+        return createJson(profile, json_post_list)
+
+class WebRequestHandler(BaseHTTPRequestHandler):
+   def do_GET(self):
+        username = parse_qs(urlparse(self.path).query).get('username', 'instagram')[0]
+        
+        cached_result = cache.get("instagram_feed_" + username)
+        if cached_result is not None:
+            returns = cached_result
+        else:
+            returns = getInstagramFeed(username)
+            cache["instagram_feed" + username] = returns
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.end_headers()
         self.wfile.write(json.dumps(returns, indent=4).encode("utf-8"))
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--port', nargs='?', const=8888, type=int, default=8888)

@@ -7,6 +7,13 @@ from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import parse_qsl, urlparse, parse_qs
 from cachetools import TTLCache
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+IG_USERNAME = os.getenv('IG_USERNAME')
+IG_PASSWORD = os.getenv('IG_PASSWORD')
 
 cache = TTLCache(maxsize=1, ttl=3600)
 
@@ -34,7 +41,7 @@ def createMediaJson(post):
 
 def getInstagramFeed(username):
         L = instaloader.Instaloader(download_pictures=False, download_videos=False, download_video_thumbnails=False)
-        L.login("defaultusernameld","Fia7qqun!")
+        L.login(IG_USERNAME,IG_PASSWORD)
         profile = instaloader.Profile.from_username(L.context, username)
         json_post_list = []
         for post in profile.get_posts():

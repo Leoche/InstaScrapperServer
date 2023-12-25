@@ -1,12 +1,26 @@
 from instagrapi import Client
 from instagrapi.exceptions import LoginRequired
 import logging
+import http.server
 import json
 import argparse
 import os
+from http.cookies import SimpleCookie
+from http.server import BaseHTTPRequestHandler
+from urllib.parse import parse_qsl, urlparse, parse_qs
 from dotenv import load_dotenv
+import time
+from pprint import pprint
+
 
 load_dotenv()
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--dump', nargs='?', const=8888, type=bool, default=False)
+parser.add_argument('--port', nargs='?', const=8888, type=int, default=8888)
+args = parser.parse_args()
+PORT = args.port
+DUMP = args.dump
 
 IG_USERNAME = os.getenv('IG_USERNAME')
 IG_PASSWORD = os.getenv('IG_PASSWORD')
@@ -14,17 +28,28 @@ IG_PASSWORD = os.getenv('IG_PASSWORD')
 print(IG_USERNAME)
 print(IG_PASSWORD)
 logger = logging.getLogger()
+
+def createJson(profile, posts, time):
+    return {
+        "id":profile.pk,
+        "userName":profile.username,
+        "fullName":profile.full_name,
+        "link":"https://www.instagram.com/" + profile.username,
+        "profilePicture":str(profile.profile_pic_url),
+        "medias":posts,
+        "time":time
+    }
 def createMediaJson(post):
     return {
-        "id":post.mediaid,
-        "thumbnailSrc":instaloader.get_json_structure(post).get("node").get("thumbnail_src"),
-        "link":"https://instagram.com/p/" + post.shortcode,
+        "id":post.pk,
+        "thumbnailSrc":str(post.thumbnail_url or post.resources[0].thumbnail_url),
+        "link":"https://instagram.com/p/" + post.code,
         "date":{
-            "date":post.date_utc.strftime("%Y-%m-%d %H:%M:%S")
+            "date":post.taken_at.strftime("%Y-%m-%d %H:%M:%S")
         },
-        "caption":post.caption,
-        "video":post.is_video,
-        "videoUrl":post.video_url
+        "caption":post.caption_text,
+        "video":(len(post.resources) > 0 and post.resources[0].video_url) or post.video_url is not None,
+        "videoUrl": str(post.resources[0].video_url) if post.resources and len(post.resources) > 0 and post.resources[0] else str(post.video_url)
     }
 
 def login_user():
@@ -76,16 +101,41 @@ def login_user():
         raise Exception("Couldn't login user with either password or session")
     return cl
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--dump', nargs='?', const=8888, type=bool, default=False)
-args = parser.parse_args()
-DUMP = args.dump
-print("DUMP:" + DUMP);
+class WebRequestHandler(BaseHTTPRequestHandler):
+   def do_GET(self):
+        start = time.time()
+        username = parse_qs(urlparse(self.path).query).get('username', 'instagram')[0]
+        if len(username) > 2:
+            user = cl.user_info_by_username(username)
+            print(username)
+            print(user.pk)
+            json_post_list = []
+            for post in cl.user_medias_v1(user.pk, 12):
+                json_post_list.append(createMediaJson(post))
+            returns = createJson(user, json_post_list, str(time.time() - start))
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps(returns, indent=4).encode("utf-8"))
+        else:
+            self.send_response(200)
+            self.wfile.write("".encode("utf-8"))
 
+print("DUMP:" + str(int(DUMP)));
+
+# Init scrapper
 cl = login_user()
 if DUMP:
     cl.dump_settings('session.json')
-user_id = cl.user_id_from_username("mmagramm")
-print(user_id)
-medias = cl.user_medias(user_id, 12)
+
+# Init webserver
+server_address = ("", PORT)
+server = http.server.HTTPServer
+handler = http.server.CGIHTTPRequestHandler
+print("Listening to port:", PORT)
+httpd = server(server_address, WebRequestHandler)
+httpd.serve_forever()
+
+
+#medias = cl.user_medias(user_id, 12)
 #print(json.dumps(medias, indent=4))
